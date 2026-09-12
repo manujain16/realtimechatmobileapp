@@ -106,16 +106,25 @@ class ChatWebSocket {
         else "$command\n$headerText\ncontent-length:${body.toByteArray(Charsets.UTF_8).size}\n\n$body\u0000"
     }
 
-    fun sendMessage(username: String, content: String) {
+    fun sendMessage(username: String, content: String, imageData: String? = null) {
         if (!stompConnected) return
-        val json = JSONObject().put("sender", username).put("content", content).put("type", "CHAT").toString()
-        webSocket?.send(buildFrame("SEND", listOf("destination" to "/app/chat.sendMessage", "content-type" to "application/json"), json))
+        val json = JSONObject()
+            .put("sender", username)
+            .put("content", content)
+            .put("type", "CHAT")
+        if (!imageData.isNullOrBlank()) json.put("imageData", imageData)
+        webSocket?.send(buildFrame("SEND", listOf("destination" to "/app/chat.sendMessage", "content-type" to "application/json"), json.toString()))
     }
 
-    fun sendPrivateMessage(username: String, recipient: String, content: String) {
+    fun sendPrivateMessage(username: String, recipient: String, content: String, imageData: String? = null) {
         if (!stompConnected) return
-        val json = JSONObject().put("sender", username).put("recipient", recipient).put("content", content).put("type", "PRIVATE_MESSAGE").toString()
-        webSocket?.send(buildFrame("SEND", listOf("destination" to "/app/chat.sendPrivateMessage", "content-type" to "application/json"), json))
+        val json = JSONObject()
+            .put("sender", username)
+            .put("recipient", recipient)
+            .put("content", content)
+            .put("type", "PRIVATE_MESSAGE")
+        if (!imageData.isNullOrBlank()) json.put("imageData", imageData)
+        webSocket?.send(buildFrame("SEND", listOf("destination" to "/app/chat.sendPrivateMessage", "content-type" to "application/json"), json.toString()))
     }
 
     fun disconnect() {
