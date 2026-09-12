@@ -1,13 +1,16 @@
 package com.chatapp.indiachatdosti.websocket
 
-import io.reactivex.disposables.Disposable
-import ua.naiksoftware.stomp.Stomp
-import ua.naiksoftware.stomp.StompClient
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.Response
+import okhttp3.WebSocket
+import okhttp3.WebSocketListener
+import okio.ByteString
 
 class ChatWebSocket {
 
-    private lateinit var stompClient: StompClient
-    private var publicSubscription: Disposable? = null
+    private val client = OkHttpClient()
+    private var webSocket: WebSocket? = null
 
     fun connect(
         username: String,
@@ -17,117 +20,62 @@ class ChatWebSocket {
         onMessage: (String) -> Unit,
         onError: (Throwable) -> Unit
     ) {
-        // /ws is the browser SockJS endpoint. Android uses the direct WebSocket endpoint.
+        // Diagnostic only: bypass StompProtocolAndroid and test the native WebSocket handshake directly.
+        // If onOpen fires, Render/Spring /ws-native is accepting a standard WebSocket handshake.
         val url = "wss://indiachatdosti.onrender.com/ws-native"
 
-        stompClient = Stomp.over(
-            Stomp.ConnectionProvider.OKHTTP,
-            url
-        )
+        val request = Request.Builder()
+            .url(url)
+            .header("Origin", "https://indiachatdosti.onrender.com")
+            .build()
 
-        stompClient.connect()
+        println("OKHTTP WS: connecting to $url")
 
-        stompClient.lifecycle()
-            .subscribe { lifecycleEvent ->
-                when (lifecycleEvent.type) {
-                    ua.naiksoftware.stomp.dto.LifecycleEvent.Type.OPENED -> {
-                        println("STOMP connected")
-                        onConnected()
-                        subscribeToPublicChat(onMessage)
-                        addUser(
-                            username,
-                            gender,
-                            location
-                        )
-                    }
-
-                    ua.naiksoftware.stomp.dto.LifecycleEvent.Type.ERROR -> {
-                        lifecycleEvent.exception?.let {
-                            onError(it)
-                        }
-                    }
-
-                    ua.naiksoftware.stomp.dto.LifecycleEvent.Type.CLOSED -> {
-                        println("STOMP connection closed")
-                    }
-
-                    else -> {}
-                }
+        webSocket = client.newWebSocket(request, object : WebSocketListener() {
+            override fun onOpen(webSocket: WebSocket, response: Response) {
+                println("OKHTTP WS: onOpen - HTTP ${response.code}")
+                println("OKHTTP WS: response=$response")
+                onConnected()
             }
-    }
 
-    private fun subscribeToPublicChat(onMessage: (String) -> Unit) {
-        publicSubscription = stompClient.topic("/topic/public")
-            .subscribe(
-                { message ->
-                    println("Received: ${message.payload}")
-
-                    message.payload?.let {
-                        onMessage(it)
-                    }
-                },
-                { error ->
-                    println("Subscription error: $error")
-                }
-            )
-    }
-
-    private fun addUser(
-        username: String,
-        gender: String,
-        location: String
-    ) {
-        val json = """
-            {
-                "sender": "$username",
-                "gender": "$gender",
-                "location": "$location",
-                "type": "JOIN"
+            override fun onMessage(webSocket: WebSocket, text: String) {
+                println("OKHTTP WS: message=$text")
+                onMessage(text)
             }
-        """.trimIndent()
 
-        stompClient.send(
-            "/app/chat.addUser",
-            json
-        ).subscribe(
-            {
-                println("User joined")
-            },
-            { error ->
-                println("Join error: $error")
+            override fun onMessage(webSocket: WebSocket, bytes: ByteString) {
+                println("OKHTTP WS: binary message received")
             }
-        )
+
+            override fun onClosing(webSocket: WebSocket, code: Int, reason: String) {
+                println("OKHTTP WS: closing code=$code reason=$reason")
+                webSocket.close(code, reason)
+            }
+
+            override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
+                println("OKHTTP WS: closed code=$code reason=$reason")
+            }
+
+            override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
+                println("OKHTTP WS: FAILURE type=${t.javaClass.name} message=${t.message}")
+                println("OKHTTP WS: failure response=$response")
+                t.printStackTrace()
+                onError(t)
+            }
+        })
     }
 
     fun sendMessage(
         username: String,
         content: String
     ) {
-        val json = """
-            {
-                "sender": "$username",
-                "content": "$content",
-                "type": "CHAT"
-            }
-        """.trimIndent()
-
-        stompClient.send(
-            "/app/chat.sendMessage",
-            json
-        ).subscribe(
-            {
-                println("Message sent")
-            },
-            { error ->
-                println("Send error: $error")
-            }
-        )
+        // Diagnostic only. Do not expect STOMP routing to work in this version.
+        val sent = webSocket?.send(content) ?: false
+        println("OKHTTP WS: raw message sent=$sent content=$content")
     }
 
     fun disconnect() {
-        publicSubscription?.dispose()
-        if (::stompClient.isInitialized) {
-            stompClient.disconnect()
-        }
+        webSocket?.close(1000, "Client disconnect")
+        webSocket = null
     }
 }
