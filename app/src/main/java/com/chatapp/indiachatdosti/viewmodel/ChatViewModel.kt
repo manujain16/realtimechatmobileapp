@@ -14,19 +14,33 @@ class ChatViewModel : ViewModel() {
     val onlineUsers = mutableStateListOf<String>()
     val userGenders = mutableStateOf<Map<String, String>>(emptyMap())
     val error = mutableStateOf<String?>(null)
+    val incomingPrivateUser = mutableStateOf<String?>(null)
     private var currentUsername = ""
 
     fun connect(username: String, gender: String, location: String) {
         currentUsername = username
         error.value = null
+        incomingPrivateUser.value = null
         messages.clear(); privateMessages.clear(); onlineUsers.clear()
         chatWebSocket.connect(
             username = username, gender = gender, location = location,
             onConnected = { connected.value = true },
             onPublicMessage = { message -> messages.add(message); updateUsers(message) },
-            onPrivateMessage = { message -> privateMessages.add(message) },
+            onPrivateMessage = { message ->
+                privateMessages.add(message)
+                try {
+                    val sender = JSONObject(message).optString("sender")
+                    if (sender.isNotBlank() && sender != currentUsername) {
+                        incomingPrivateUser.value = sender
+                    }
+                } catch (_: Exception) { }
+            },
             onError = { throwable -> connected.value = false; error.value = throwable.message ?: "WebSocket connection error" }
         )
+    }
+
+    fun clearIncomingPrivateUser() {
+        incomingPrivateUser.value = null
     }
 
     private fun updateUsers(raw: String) {
