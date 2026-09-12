@@ -4,35 +4,12 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBarsPadding
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExposedDropdownMenuBox
-import androidx.compose.material3.ExposedDropdownMenuDefaults
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -46,400 +23,66 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.chatapp.indiachatdosti.viewmodel.ChatViewModel
 import org.json.JSONObject
 
-private val GradientStart = Color(0xFF667EEA)
-private val GradientEnd = Color(0xFF764BA2)
+private val PurpleStart = Color(0xFF667EEA)
+private val PurpleEnd = Color(0xFF764BA2)
 private val PageBackground = Color(0xFFF8F9FA)
-private val BorderColor = Color(0xFFE0E0E0)
 private val TextDark = Color(0xFF333333)
 private val TextMuted = Color(0xFF666666)
+private val States = listOf("Andhra Pradesh","Arunachal Pradesh","Assam","Bihar","Chhattisgarh","Goa","Gujarat","Haryana","Himachal Pradesh","Jharkhand","Karnataka","Kerala","Madhya Pradesh","Maharashtra","Manipur","Meghalaya","Mizoram","Nagaland","Odisha","Punjab","Rajasthan","Sikkim","Tamil Nadu","Telangana","Tripura","Uttar Pradesh","Uttarakhand","West Bengal","Delhi","Jammu and Kashmir","Ladakh","Puducherry","Chandigarh","Andaman and Nicobar","Dadra and Nagar Haveli","Daman and Diu","Lakshadweep")
+data class DisplayMessage(val sender:String,val content:String,val type:String)
 
-private val IndianStates = listOf(
-    "Andhra Pradesh", "Arunachal Pradesh", "Assam", "Bihar", "Chhattisgarh",
-    "Goa", "Gujarat", "Haryana", "Himachal Pradesh", "Jharkhand", "Karnataka",
-    "Kerala", "Madhya Pradesh", "Maharashtra", "Manipur", "Meghalaya", "Mizoram",
-    "Nagaland", "Odisha", "Punjab", "Rajasthan", "Sikkim", "Tamil Nadu",
-    "Telangana", "Tripura", "Uttar Pradesh", "Uttarakhand", "West Bengal", "Delhi",
-    "Jammu and Kashmir", "Ladakh", "Puducherry", "Chandigarh", "Andaman and Nicobar",
-    "Dadra and Nagar Haveli", "Daman and Diu", "Lakshadweep"
-)
+class MainActivity : ComponentActivity() { override fun onCreate(savedInstanceState:Bundle?){super.onCreate(savedInstanceState);setContent{ChatApp()}} }
 
-private data class DisplayMessage(
-    val sender: String,
-    val content: String,
-    val type: String
-)
-
-class MainActivity : ComponentActivity() {
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        setContent {
-            ChatApp()
-        }
-    }
+@Composable fun ChatApp(vm:ChatViewModel=viewModel()){
+    var joined by remember{mutableStateOf(false)}; var username by remember{mutableStateOf("")}; var gender by remember{mutableStateOf("")}; var location by remember{mutableStateOf("")}
+    if(joined) ChatScreen(vm,username) else LoginScreen(username,gender,location,{username=it},{gender=it},{location=it}){vm.connect(username,gender,location);joined=true}
 }
 
-@Composable
-fun ChatApp(chatViewModel: ChatViewModel = viewModel()) {
-    var username by remember { mutableStateOf("") }
-    var gender by remember { mutableStateOf("") }
-    var location by remember { mutableStateOf("") }
-    var joined by remember { mutableStateOf(false) }
-
-    if (joined) {
-        ChatScreen(chatViewModel = chatViewModel, username = username)
-    } else {
-        LoginScreen(
-            username = username,
-            gender = gender,
-            location = location,
-            onUsernameChange = { username = it },
-            onGenderChange = { gender = it },
-            onLocationChange = { location = it },
-            onEnterChat = {
-                if (username.isNotBlank() && gender.isNotBlank() && location.isNotBlank()) {
-                    chatViewModel.connect(username, gender, location)
-                    joined = true
-                }
-            }
-        )
-    }
-}
-
-@Composable
-fun LoginScreen(
-    username: String,
-    gender: String,
-    location: String,
-    onUsernameChange: (String) -> Unit,
-    onGenderChange: (String) -> Unit,
-    onLocationChange: (String) -> Unit,
-    onEnterChat: () -> Unit
-) {
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Brush.linearGradient(listOf(GradientStart, GradientEnd)))
-            .padding(20.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(15.dp))
-                .background(Color.White)
-                .padding(28.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Text(
-                text = "💬 Real-Time Chat",
-                fontSize = 28.sp,
-                fontWeight = FontWeight.Bold,
-                color = TextDark,
-                textAlign = TextAlign.Center
-            )
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            Text(
-                text = "Enter your name to join the conversation",
-                color = TextMuted,
-                fontSize = 16.sp,
-                textAlign = TextAlign.Center
-            )
-
-            Spacer(modifier = Modifier.height(24.dp))
-
-            OutlinedTextField(
-                value = username,
-                onValueChange = onUsernameChange,
-                placeholder = { Text("Enter your username...") },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth()
-            )
-
-            Spacer(modifier = Modifier.height(14.dp))
-
-            WebsiteDropdown(
-                label = "👤 Select Your Gender",
-                value = gender,
-                options = listOf("Male", "Female"),
-                placeholder = "Choose gender...",
-                onSelected = onGenderChange
-            )
-
-            Spacer(modifier = Modifier.height(14.dp))
-
-            WebsiteDropdown(
-                label = "📍 Select Your Location",
-                value = location,
-                options = IndianStates,
-                placeholder = "Choose your state...",
-                onSelected = onLocationChange
-            )
-
-            Spacer(modifier = Modifier.height(20.dp))
-
-            GradientButton(
-                text = "Join Chat",
-                enabled = username.isNotBlank() && gender.isNotBlank() && location.isNotBlank(),
-                onClick = onEnterChat
-            )
+@Composable fun LoginScreen(username:String,gender:String,location:String,onUsername:(String)->Unit,onGender:(String)->Unit,onLocation:(String)->Unit,onJoin:()->Unit){
+    Box(modifier=Modifier.fillMaxSize().background(Brush.linearGradient(listOf(PurpleStart,PurpleEnd))).padding(20.dp),contentAlignment=Alignment.Center){
+        Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(15.dp)).background(Color.White).padding(28.dp),horizontalAlignment=Alignment.CenterHorizontally){
+            Text("💬 Real-Time Chat",fontSize=28.sp,fontWeight=FontWeight.Bold,color=TextDark); Spacer(Modifier.height(8.dp)); Text("Enter your name to join the conversation",color=TextMuted)
+            Spacer(Modifier.height(24.dp)); OutlinedTextField(username,onUsername,placeholder={Text("Enter your username...")},singleLine=true,modifier=Modifier.fillMaxWidth())
+            Spacer(Modifier.height(14.dp)); Dropdown("👤 Select Your Gender",gender,listOf("Male","Female"),"Choose gender...",onGender)
+            Spacer(Modifier.height(14.dp)); Dropdown("📍 Select Your Location",location,States,"Choose your state...",onLocation)
+            Spacer(Modifier.height(20.dp)); Button(onClick=onJoin,enabled=username.isNotBlank()&&gender.isNotBlank()&&location.isNotBlank(),modifier=Modifier.fillMaxWidth(),shape=RoundedCornerShape(8.dp),colors=ButtonDefaults.buttonColors(containerColor=PurpleStart)){Text("Join Chat",fontWeight=FontWeight.SemiBold)}
         }
     }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun WebsiteDropdown(
-    label: String,
-    value: String,
-    options: List<String>,
-    placeholder: String,
-    onSelected: (String) -> Unit
-) {
-    var expanded by remember { mutableStateOf(false) }
-
-    ExposedDropdownMenuBox(
-        expanded = expanded,
-        onExpandedChange = { expanded = !expanded },
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        OutlinedTextField(
-            value = value,
-            onValueChange = {},
-            readOnly = true,
-            label = { Text(label) },
-            placeholder = { Text(placeholder) },
-            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded) },
-            modifier = Modifier
-                .menuAnchor()
-                .fillMaxWidth(),
-            singleLine = true
-        )
-
-        ExposedDropdownMenu(
-            expanded = expanded,
-            onDismissRequest = { expanded = false }
-        ) {
-            options.forEach { option ->
-                DropdownMenuItem(
-                    text = { Text(option) },
-                    onClick = {
-                        onSelected(option)
-                        expanded = false
-                    }
-                )
-            }
-        }
+@Composable fun Dropdown(label:String,value:String,options:List<String>,placeholder:String,onSelect:(String)->Unit){
+    var expanded by remember{mutableStateOf(false)}
+    ExposedDropdownMenuBox(expanded=expanded,onExpandedChange={expanded=!expanded},modifier=Modifier.fillMaxWidth()){
+        OutlinedTextField(value,{},readOnly=true,label={Text(label)},placeholder={Text(placeholder)},trailingIcon={ExposedDropdownMenuDefaults.TrailingIcon(expanded)},modifier=Modifier.menuAnchor().fillMaxWidth(),singleLine=true)
+        ExposedDropdownMenu(expanded,{expanded=false}){options.forEach{option->DropdownMenuItem(text={Text(option)},onClick={onSelect(option);expanded=false})}}
     }
 }
 
-@Composable
-private fun GradientButton(text: String, enabled: Boolean, onClick: () -> Unit) {
-    Button(
-        onClick = onClick,
-        enabled = enabled,
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(8.dp),
-        colors = ButtonDefaults.buttonColors(
-            containerColor = GradientStart,
-            contentColor = Color.White,
-            disabledContainerColor = Color(0xFFBDBDBD),
-            disabledContentColor = Color.White
-        )
-    ) {
-        Text(text = text, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+@Composable fun ChatScreen(vm:ChatViewModel,username:String){
+    var text by remember{mutableStateOf("")}; var showUsers by remember{mutableStateOf(false)}; var privateUser by remember{mutableStateOf<String?>(null)}
+    val public=vm.messages.mapNotNull{parse(it)}
+    Column(Modifier.fillMaxSize().background(Color.White)){
+        Box(Modifier.fillMaxWidth().background(Brush.linearGradient(listOf(PurpleStart,PurpleEnd))).padding(16.dp)){
+            Column(Modifier.fillMaxWidth(),horizontalAlignment=Alignment.CenterHorizontally){Text("💬 Chat Room",color=Color.White,fontSize=21.sp,fontWeight=FontWeight.Bold);Text("Welcome, $username!",color=Color.White.copy(.9f),fontSize=14.sp);Text(if(vm.connected.value)"● Connected" else "⏳ Connecting...",color=Color.White.copy(.9f),fontSize=12.sp)}
+            TextButton(onClick={showUsers=true},modifier=Modifier.align(Alignment.CenterEnd)){Text("👥 ${vm.onlineUsers.size}",color=Color.White)}
+        }
+        LazyColumn(Modifier.weight(1f).fillMaxWidth().background(PageBackground).padding(16.dp),verticalArrangement=Arrangement.spacedBy(5.dp)){items(public){m->if(m.type=="JOIN"||m.type=="LEAVE")Event(m)else if(m.content.isNotBlank())Bubble(m,m.sender==username)}}
+        Row(Modifier.fillMaxWidth().background(Color.White).padding(12.dp),verticalAlignment=Alignment.CenterVertically){TextButton(onClick={text+="😊"}){Text("😊",fontSize=22.sp)};OutlinedTextField(text,{text=it},placeholder={Text("Type a message...")},singleLine=true,modifier=Modifier.weight(1f));Spacer(Modifier.width(8.dp));Button(onClick={vm.sendMessage(text.trim());text=""},enabled=vm.connected.value&&text.isNotBlank(),colors=ButtonDefaults.buttonColors(containerColor=PurpleStart)){Text("Send")}}
     }
+    if(showUsers)OnlineUsersDialog(vm,username,{showUsers=false},{privateUser=it;showUsers=false})
+    privateUser?.let{PrivateChatDialog(vm,username,it){privateUser=null}}
 }
 
-@Composable
-fun ChatScreen(chatViewModel: ChatViewModel, username: String) {
-    var messageText by remember { mutableStateOf("") }
+fun parse(raw:String):DisplayMessage?=try{val j=JSONObject(raw);DisplayMessage(j.optString("sender"),j.optString("content"),j.optString("type"))}catch(_:Exception){null}
+@Composable fun Bubble(m:DisplayMessage,own:Boolean){Column(Modifier.fillMaxWidth().padding(vertical=4.dp),horizontalAlignment=if(own)Alignment.End else Alignment.Start){if(!own)Text(m.sender,color=TextMuted,fontSize=13.sp,fontWeight=FontWeight.SemiBold);Box(Modifier.clip(RoundedCornerShape(12.dp)).background(if(own)Brush.linearGradient(listOf(PurpleStart,PurpleEnd)) else Brush.linearGradient(listOf(Color.White,Color.White))).padding(14.dp)){Text(m.content,color=if(own)Color.White else TextDark)}}}
+@Composable fun Event(m:DisplayMessage){Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(Color(0xFFE3F2FD)).padding(9.dp)){Text("${m.sender} ${if(m.type=="JOIN")"joined" else "left"} the chat",color=Color(0xFF1976D2),modifier=Modifier.fillMaxWidth(),textAlign=TextAlign.Center,fontSize=13.sp)}}
 
-    val displayMessages = chatViewModel.messages.mapNotNull { raw ->
-        try {
-            val json = JSONObject(raw)
-            DisplayMessage(
-                sender = json.optString("sender"),
-                content = json.optString("content"),
-                type = json.optString("type")
-            )
-        } catch (_: Exception) {
-            null
-        }
-    }
-
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color.White)
-            .navigationBarsPadding()
-    ) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(Brush.linearGradient(listOf(GradientStart, GradientEnd)))
-                .padding(horizontal = 20.dp, vertical = 18.dp)
-        ) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
-                Text(
-                    text = "💬 Chat Room",
-                    color = Color.White,
-                    fontSize = 21.sp,
-                    fontWeight = FontWeight.Bold
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = "Welcome, $username!",
-                    color = Color.White.copy(alpha = 0.9f),
-                    fontSize = 14.sp
-                )
-            }
-        }
-
-        if (!chatViewModel.connected.value) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(Color.White)
-                    .padding(vertical = 12.dp),
-                horizontalArrangement = Arrangement.Center,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text("⏳  Connecting to chat...", color = GradientStart, fontSize = 14.sp)
-            }
-        }
-
-        chatViewModel.error.value?.let { errorMessage ->
-            Text(
-                text = "Error: $errorMessage",
-                color = Color(0xFFD32F2F),
-                fontSize = 13.sp,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
-            )
-        }
-
-        LazyColumn(
-            modifier = Modifier
-                .weight(1f)
-                .fillMaxWidth()
-                .background(PageBackground),
-            reverseLayout = false,
-            contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp)
-        ) {
-            items(displayMessages) { message ->
-                if (message.type == "JOIN" || message.type == "LEAVE") {
-                    EventMessage(message)
-                } else if (message.content.isNotBlank()) {
-                    ChatBubble(message = message, ownMessage = message.sender == username)
-                }
-            }
-        }
-
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(Color.White)
-                .padding(12.dp)
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                TextButton(
-                    onClick = { messageText += "😊" },
-                    modifier = Modifier.size(48.dp)
-                ) {
-                    Text("😊", fontSize = 22.sp)
-                }
-
-                Spacer(modifier = Modifier.width(4.dp))
-
-                OutlinedTextField(
-                    value = messageText,
-                    onValueChange = { messageText = it },
-                    placeholder = { Text("Type a message...") },
-                    singleLine = true,
-                    modifier = Modifier.weight(1f)
-                )
-
-                Spacer(modifier = Modifier.width(8.dp))
-
-                Button(
-                    onClick = {
-                        if (messageText.isNotBlank()) {
-                            chatViewModel.sendMessage(messageText.trim())
-                            messageText = ""
-                        }
-                    },
-                    enabled = chatViewModel.connected.value && messageText.isNotBlank(),
-                    shape = RoundedCornerShape(8.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = GradientStart)
-                ) {
-                    Text("Send")
-                }
-            }
-        }
-    }
+@Composable fun OnlineUsersDialog(vm:ChatViewModel,me:String,onClose:()->Unit,onSelect:(String)->Unit){
+    AlertDialog(onDismissRequest=onClose,title={Text("👥 Online Users")},text={Column{Text("${vm.onlineUsers.size} users online",color=TextMuted);Spacer(Modifier.height(8.dp));LazyColumn{items(vm.onlineUsers.filter{it!=me}){user->Row(Modifier.fillMaxWidth().padding(vertical=7.dp),verticalAlignment=Alignment.CenterVertically){Text("🟢 $user",modifier=Modifier.weight(1f));TextButton(onClick={onSelect(user)}){Text("Chat")}}}}}},confirmButton={TextButton(onClick=onClose){Text("Close")}})
 }
 
-@Composable
-private fun ChatBubble(message: DisplayMessage, ownMessage: Boolean) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 5.dp),
-        horizontalAlignment = if (ownMessage) Alignment.End else Alignment.Start
-    ) {
-        if (!ownMessage) {
-            Text(
-                text = message.sender,
-                color = TextMuted,
-                fontSize = 13.sp,
-                fontWeight = FontWeight.SemiBold,
-                modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
-            )
-        }
-
-        Box(
-            modifier = Modifier
-                .clip(RoundedCornerShape(12.dp))
-                .background(
-                    if (ownMessage) {
-                        Brush.linearGradient(listOf(GradientStart, GradientEnd))
-                    } else {
-                        Brush.linearGradient(listOf(Color.White, Color.White))
-                    }
-                )
-                .padding(horizontal = 14.dp, vertical = 11.dp)
-        ) {
-            Text(
-                text = message.content,
-                color = if (ownMessage) Color.White else TextDark,
-                fontSize = 16.sp
-            )
-        }
-    }
-}
-
-@Composable
-private fun EventMessage(message: DisplayMessage) {
-    val action = if (message.type == "JOIN") "joined the chat" else "left the chat"
-
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 7.dp)
-            .clip(RoundedCornerShape(8.dp))
-            .background(Color(0xFFE3F2FD))
-            .padding(10.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        Text(
-            text = "${message.sender} $action",
-            color = Color(0xFF1976D2),
-            fontSize = 13.sp,
-            textAlign = TextAlign.Center
-        )
-    }
+@Composable fun PrivateChatDialog(vm:ChatViewModel,me:String,recipient:String,onClose:()->Unit){
+    var text by remember{mutableStateOf("")}; val msgs=vm.privateMessages.mapNotNull{parse(it)}.filter{it.sender==recipient||it.sender==me}
+    AlertDialog(onDismissRequest=onClose,title={Text("💬 Private Chat with $recipient")},text={Column(Modifier.fillMaxWidth().height(360.dp)){LazyColumn(Modifier.weight(1f)){items(msgs){m->Bubble(m,m.sender==me)}};Row(verticalAlignment=Alignment.CenterVertically){OutlinedTextField(text,{text=it},placeholder={Text("Private message...")},singleLine=true,modifier=Modifier.weight(1f));Spacer(Modifier.width(5.dp));Button(onClick={vm.sendPrivateMessage(recipient,text.trim());text=""},enabled=text.isNotBlank(),colors=ButtonDefaults.buttonColors(containerColor=PurpleStart)){Text("Send")}}}},confirmButton={TextButton(onClick=onClose){Text("Close")}})
 }
