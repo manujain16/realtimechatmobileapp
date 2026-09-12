@@ -1,15 +1,14 @@
 package com.chatapp.indiachatdosti.websocket
 
-import org.json.JSONObject
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.Response
 import okhttp3.WebSocket
 import okhttp3.WebSocketListener
 import okio.ByteString
+import org.json.JSONObject
 
 class ChatWebSocket {
-
     private val client = OkHttpClient()
     private var webSocket: WebSocket? = null
     private var stompConnected = false
@@ -20,65 +19,32 @@ class ChatWebSocket {
         gender: String,
         location: String,
         onConnected: () -> Unit,
-        onMessage: (String) -> Unit,
+        onPublicMessage: (String) -> Unit,
+        onPrivateMessage: (String) -> Unit,
         onError: (Throwable) -> Unit
     ) {
         val url = "wss://indiachatdosti.onrender.com/ws-native"
-
         val request = Request.Builder()
             .url(url)
             .header("Origin", "https://indiachatdosti.onrender.com")
             .header("Sec-WebSocket-Protocol", "v12.stomp")
             .build()
 
-        println("OKHTTP STOMP: connecting to $url")
-
         webSocket = client.newWebSocket(request, object : WebSocketListener() {
-            override fun onOpen(webSocket: WebSocket, response: Response) {
-                println("OKHTTP STOMP: WebSocket OPEN HTTP ${response.code}")
-                sendStompConnect(webSocket)
-            }
-
-            override fun onMessage(webSocket: WebSocket, text: String) {
-                println("OKHTTP STOMP: received=$text")
-                processIncoming(text, webSocket, username, gender, location, onConnected, onMessage)
-            }
-
-            override fun onMessage(webSocket: WebSocket, bytes: ByteString) {
-                processIncoming(bytes.utf8(), webSocket, username, gender, location, onConnected, onMessage)
-            }
-
-            override fun onClosing(webSocket: WebSocket, code: Int, reason: String) {
-                println("OKHTTP STOMP: closing code=$code reason=$reason")
-                webSocket.close(code, reason)
-            }
-
-            override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
-                stompConnected = false
-                println("OKHTTP STOMP: closed code=$code reason=$reason")
-            }
-
-            override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
-                stompConnected = false
-                println("OKHTTP STOMP: FAILURE ${t.javaClass.name}: ${t.message}")
-                println("OKHTTP STOMP: failure response=$response")
-                t.printStackTrace()
-                onError(t)
-            }
+            override fun onOpen(webSocket: WebSocket, response: Response) = sendStompConnect(webSocket)
+            override fun onMessage(webSocket: WebSocket, text: String) = processIncoming(text, webSocket, username, gender, location, onConnected, onPublicMessage, onPrivateMessage)
+            override fun onMessage(webSocket: WebSocket, bytes: ByteString) = processIncoming(bytes.utf8(), webSocket, username, gender, location, onConnected, onPublicMessage, onPrivateMessage)
+            override fun onClosed(webSocket: WebSocket, code: Int, reason: String) { stompConnected = false }
+            override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) { stompConnected = false; onError(t) }
         })
     }
 
     private fun sendStompConnect(webSocket: WebSocket) {
-        val frame = buildFrame(
-            command = "CONNECT",
-            headers = listOf(
-                "accept-version" to "1.2",
-                "host" to "indiachatdosti.onrender.com",
-                "heart-beat" to "10000,10000"
-            )
-        )
-        println("OKHTTP STOMP: sending CONNECT")
-        webSocket.send(frame)
+        webSocket.send(buildFrame("CONNECT", listOf(
+            "accept-version" to "1.2",
+            "host" to "indiachatdosti.onrender.com",
+            "heart-beat" to "10000,10000"
+        )))
     }
 
     private fun processIncoming(
@@ -88,138 +54,67 @@ class ChatWebSocket {
         gender: String,
         location: String,
         onConnected: () -> Unit,
-        onMessage: (String) -> Unit
+        onPublicMessage: (String) -> Unit,
+        onPrivateMessage: (String) -> Unit
     ) {
         incomingBuffer += text
-
         while (incomingBuffer.contains('\u0000')) {
             val end = incomingBuffer.indexOf('\u0000')
-            val rawFrame = incomingBuffer.substring(0, end)
+            val frame = incomingBuffer.substring(0, end)
             incomingBuffer = incomingBuffer.substring(end + 1)
-
-            if (rawFrame.isBlank()) continue
-            handleStompFrame(
-                rawFrame,
-                webSocket,
-                username,
-                gender,
-                location,
-                onConnected,
-                onMessage
-            )
+            if (frame.isNotBlank()) handleFrame(frame, webSocket, username, gender, location, onConnected, onPublicMessage, onPrivateMessage)
         }
     }
 
-    private fun handleStompFrame(
+    private fun handleFrame(
         frame: String,
         webSocket: WebSocket,
         username: String,
         gender: String,
         location: String,
         onConnected: () -> Unit,
-        onMessage: (String) -> Unit
+        onPublicMessage: (String) -> Unit,
+        onPrivateMessage: (String) -> Unit
     ) {
-        val lines = frame.split("\n")
-        val command = lines.firstOrNull()?.trim() ?: return
-        println("OKHTTP STOMP: frame=$command")
-
-        when (command) {
+        when (frame.substringBefore('\n').trim()) {
             "CONNECTED" -> {
                 stompConnected = true
-                println("OKHTTP STOMP: STOMP CONNECTED")
-
-                webSocket.send(
-                    buildFrame(
-                        "SUBSCRIBE",
-                        listOf(
-                            "id" to "public-chat",
-                            "destination" to "/topic/public",
-                            "ack" to "auto"
-                        )
-                    )
-                )
-
-                val joinJson = JSONObject()
-                    .put("sender", username)
-                    .put("gender", gender)
-                    .put("location", location)
-                    .put("type", "JOIN")
-                    .toString()
-
-                webSocket.send(
-                    buildFrame(
-                        "SEND",
-                        listOf(
-                            "destination" to "/app/chat.addUser",
-                            "content-type" to "application/json"
-                        ),
-                        joinJson
-                    )
-                )
-
+                webSocket.send(buildFrame("SUBSCRIBE", listOf("id" to "public-chat", "destination" to "/topic/public", "ack" to "auto")))
+                webSocket.send(buildFrame("SUBSCRIBE", listOf("id" to "private-chat", "destination" to "/user/queue/private", "ack" to "auto")))
+                val join = JSONObject().put("sender", username).put("gender", gender).put("location", location).put("type", "JOIN").toString()
+                webSocket.send(buildFrame("SEND", listOf("destination" to "/app/chat.addUser", "content-type" to "application/json"), join))
                 onConnected()
             }
-
             "MESSAGE" -> {
                 val bodyStart = frame.indexOf("\n\n")
                 if (bodyStart >= 0) {
-                    val body = frame.substring(bodyStart + 2)
+                    val body = frame.substring(bodyStart + 2).trimEnd('\r')
                     if (body.isNotBlank()) {
-                        onMessage(body)
+                        val destination = frame.lineSequence().firstOrNull { it.startsWith("destination:") }?.substringAfter(":") ?: ""
+                        if (destination == "/user/queue/private" || destination.startsWith("/user/")) onPrivateMessage(body)
+                        else onPublicMessage(body)
                     }
                 }
             }
-
-            "ERROR" -> {
-                val bodyStart = frame.indexOf("\n\n")
-                val details = if (bodyStart >= 0) frame.substring(bodyStart + 2) else frame
-                println("OKHTTP STOMP: SERVER ERROR $details")
-            }
-
-            "RECEIPT" -> println("OKHTTP STOMP: RECEIPT")
-            "\n" -> Unit
         }
     }
 
-    private fun buildFrame(
-        command: String,
-        headers: List<Pair<String, String>>,
-        body: String = ""
-    ): String {
+    private fun buildFrame(command: String, headers: List<Pair<String, String>>, body: String = ""): String {
         val headerText = headers.joinToString("\n") { "${it.first}:${it.second}" }
-        return if (body.isEmpty()) {
-            "$command\n$headerText\n\n\u0000"
-        } else {
-            "$command\n$headerText\ncontent-length:${body.toByteArray(Charsets.UTF_8).size}\n\n$body\u0000"
-        }
+        return if (body.isEmpty()) "$command\n$headerText\n\n\u0000"
+        else "$command\n$headerText\ncontent-length:${body.toByteArray(Charsets.UTF_8).size}\n\n$body\u0000"
     }
 
-    fun sendMessage(
-        username: String,
-        content: String
-    ) {
-        if (!stompConnected) {
-            println("OKHTTP STOMP: cannot send; STOMP is not connected")
-            return
-        }
+    fun sendMessage(username: String, content: String) {
+        if (!stompConnected) return
+        val json = JSONObject().put("sender", username).put("content", content).put("type", "CHAT").toString()
+        webSocket?.send(buildFrame("SEND", listOf("destination" to "/app/chat.sendMessage", "content-type" to "application/json"), json))
+    }
 
-        val json = JSONObject()
-            .put("sender", username)
-            .put("content", content)
-            .put("type", "CHAT")
-            .toString()
-
-        val frame = buildFrame(
-            "SEND",
-            listOf(
-                "destination" to "/app/chat.sendMessage",
-                "content-type" to "application/json"
-            ),
-            json
-        )
-
-        val sent = webSocket?.send(frame) ?: false
-        println("OKHTTP STOMP: message sent=$sent")
+    fun sendPrivateMessage(username: String, recipient: String, content: String) {
+        if (!stompConnected) return
+        val json = JSONObject().put("sender", username).put("recipient", recipient).put("content", content).put("type", "PRIVATE_MESSAGE").toString()
+        webSocket?.send(buildFrame("SEND", listOf("destination" to "/app/chat.sendPrivateMessage", "content-type" to "application/json"), json))
     }
 
     fun disconnect() {
