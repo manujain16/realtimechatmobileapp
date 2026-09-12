@@ -116,24 +116,64 @@ fun decodeImage(data:String):Bitmap?=try{val encoded=data.substringAfter(",",dat
     IconButton(onClick={launcher.launch("image/*")}){Text("📷",fontSize=22.sp)}
 }
 
-fun prepareImageData(context:Context,uri:Uri):String?=try{
-    val source=context.contentResolver.openInputStream(uri)?.use{BitmapFactory.decodeStream(it)} ?: return null
-    val maxDimension=1280
-    val scale=minOf(1f,maxDimension.toFloat()/maxOf(source.width,source.height))
-    val width=(source.width*scale).toInt().coerceAtLeast(1); val height=(source.height*scale).toInt().coerceAtLeast(1)
-    val bitmap=Bitmap.createScaledBitmap(source,width,height,true)
-    var quality=78
-    var bytes:ByteArray
-    do{val out=ByteArrayOutputStream();bitmap.compress(Bitmap.CompressFormat.JPEG,quality,out);bytes=out.toByteArray();quality-=8}while(bytes.size>500*1024&&quality>=38)
-    if(bytes.size>500*1024)return null
-    "data:image/jpeg;base64,"+Base64.encodeToString(bytes,Base64.NO_WRAP)
-}catch(_:Exception){null}
+fun prepareImageData(context:Context,uri:Uri):String? {
+    return try {
+        val source=context.contentResolver.openInputStream(uri)?.use{BitmapFactory.decodeStream(it)} ?: return null
+        val maxDimension=1280
+        val scale=minOf(1f,maxDimension.toFloat()/maxOf(source.width,source.height))
+        val width=(source.width*scale).toInt().coerceAtLeast(1); val height=(source.height*scale).toInt().coerceAtLeast(1)
+        val bitmap=Bitmap.createScaledBitmap(source,width,height,true)
+        var quality=78
+        var bytes:ByteArray
+        do{val out=ByteArrayOutputStream();bitmap.compress(Bitmap.CompressFormat.JPEG,quality,out);bytes=out.toByteArray();quality-=8}while(bytes.size>500*1024&&quality>=38)
+        if(bytes.size>500*1024)return null
+        "data:image/jpeg;base64,"+Base64.encodeToString(bytes,Base64.NO_WRAP)
+    }catch(_:Exception){null}
+}
 
 @Composable fun Event(m:DisplayMessage){Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(Color(0xFFE3F2FD)).padding(9.dp)){Text("${m.sender} ${if(m.type=="JOIN")"joined" else "left"} the chat",color=Color(0xFF1976D2),modifier=Modifier.fillMaxWidth(),textAlign=TextAlign.Center,fontSize=13.sp)}}
 
 @Composable fun OnlineUsersDialog(vm:ChatViewModel,me:String,onClose:()->Unit,onSelect:(String)->Unit){
     var filter by remember{mutableStateOf("All")}; val filteredUsers=vm.onlineUsers.filter{user->user!=me&&(filter=="All"||vm.userGenders.value[user].equals(filter,ignoreCase=true))}; val groupedUsers=filteredUsers.groupBy{vm.userLocations.value[it].orEmpty().ifBlank{"Unknown"}}.toSortedMap(); val expandedLocations=remember{mutableStateMapOf<String,Boolean>()}
-    AlertDialog(onDismissRequest=onClose,title={Text("👥 Online Users")},text={Column(Modifier.fillMaxWidth()){Text("${filteredUsers.size} users shown • ${vm.onlineUsers.size} online",color=TextMuted);Spacer(Modifier.height(10.dp));Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(6.dp)){listOf("All","Male","Female").forEach{option->FilterChip(selected=filter==option,onClick={filter=option},label={Text(option)})}};Spacer(Modifier.height(8.dp));LazyColumn(Modifier.heightIn(max=360.dp)){groupedUsers.forEach{(location,users)->val expanded=expandedLocations[location]?:true;item(key="location_$location"){Surface(modifier=Modifier.fillMaxWidth().padding(top=6.dp),shape=RoundedCornerShape(8.dp),color=PageBackground,onClick={expandedLocations[location]=!expanded}){Row(Modifier.fillMaxWidth().padding(horizontal=10.dp,vertical=9.dp),verticalAlignment=Alignment.CenterVertically){Text(if(expanded)"▼" else "▶",fontSize=13.sp);Spacer(Modifier.width(7.dp));Text("📍 $location",fontWeight=FontWeight.Bold,color=PurpleEnd,modifier=Modifier.weight(1f));Text("${users.size}",fontWeight=FontWeight.Bold,color=TextMuted,fontSize=12.sp)}}}};if(expanded){items(users,key={"user_${location}_$it"}){user->val gender=vm.userGenders.value[user].orEmpty().ifBlank{"Unknown"};Row(Modifier.fillMaxWidth().padding(start=24.dp,top=6.dp,bottom=6.dp),verticalAlignment=Alignment.CenterVertically){Column(Modifier.weight(1f)){Text("🟢 $user",fontWeight=FontWeight.SemiBold,color=TextDark);Text(gender,color=TextMuted,fontSize=12.sp)};TextButton(onClick={onSelect(user)}){Text("Chat")}}}}}}}},confirmButton={TextButton(onClick=onClose){Text("Close")}})
+    AlertDialog(onDismissRequest=onClose,title={Text("👥 Online Users")},text={
+        Column(Modifier.fillMaxWidth()){
+            Text("${filteredUsers.size} users shown • ${vm.onlineUsers.size} online",color=TextMuted)
+            Spacer(Modifier.height(10.dp))
+            Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(6.dp)){
+                listOf("All","Male","Female").forEach{option->
+                    FilterChip(selected=filter==option,onClick={filter=option},label={Text(option)})
+                }
+            }
+            Spacer(Modifier.height(8.dp))
+            LazyColumn(Modifier.heightIn(max=360.dp)){
+                groupedUsers.forEach{(location,users)->
+                    val expanded=expandedLocations[location]?:true
+                    item(key="location_$location"){
+                        Surface(modifier=Modifier.fillMaxWidth().padding(top=6.dp),shape=RoundedCornerShape(8.dp),color=PageBackground,onClick={expandedLocations[location]=!expanded}){
+                            Row(Modifier.fillMaxWidth().padding(horizontal=10.dp,vertical=9.dp),verticalAlignment=Alignment.CenterVertically){
+                                Text(if(expanded)"▼" else "▶",fontSize=13.sp)
+                                Spacer(Modifier.width(7.dp))
+                                Text("📍 $location",fontWeight=FontWeight.Bold,color=PurpleEnd,modifier=Modifier.weight(1f))
+                                Text("${users.size}",fontWeight=FontWeight.Bold,color=TextMuted,fontSize=12.sp)
+                            }
+                        }
+                    }
+                    if(expanded){
+                        items(users,key={user -> "user_${location}_$user"}){user->
+                            val gender=vm.userGenders.value[user].orEmpty().ifBlank{"Unknown"}
+                            Row(Modifier.fillMaxWidth().padding(start=24.dp,top=6.dp,bottom=6.dp),verticalAlignment=Alignment.CenterVertically){
+                                Column(Modifier.weight(1f)){
+                                    Text("🟢 $user",fontWeight=FontWeight.SemiBold,color=TextDark)
+                                    Text(gender,color=TextMuted,fontSize=12.sp)
+                                }
+                                TextButton(onClick={onSelect(user)}){Text("Chat")}
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    },confirmButton={TextButton(onClick=onClose){Text("Close")}})
 }
 
 @Composable fun PrivateChatDialog(vm:ChatViewModel,me:String,recipient:String,onClose:()->Unit){
