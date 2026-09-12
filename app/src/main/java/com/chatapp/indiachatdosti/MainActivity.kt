@@ -77,7 +77,7 @@ class MainActivity : ComponentActivity() { override fun onCreate(savedInstanceSt
             TextButton(onClick={showUsers=true},modifier=Modifier.align(Alignment.CenterEnd)){Text("👥 ${vm.onlineUsers.size}",color=Color.White)}
         }
         LazyColumn(Modifier.weight(1f).fillMaxWidth().background(PageBackground).padding(16.dp),verticalArrangement=Arrangement.spacedBy(5.dp)){items(public){m->if(m.type=="JOIN"||m.type=="LEAVE")Event(m)else if(m.content.isNotBlank())Bubble(m,m.sender==username)}}
-        Row(Modifier.fillMaxWidth().background(Color.White).padding(12.dp),verticalAlignment=Alignment.CenterVertically){TextButton(onClick={text+="😊"}){Text("😊",fontSize=22.sp)};OutlinedTextField(text,{text=it},placeholder={Text("Type a message...")},singleLine=true,modifier=Modifier.weight(1f));Spacer(Modifier.width(8.dp));Button(onClick={vm.sendMessage(text.trim());text=""},enabled=vm.connected.value&&text.isNotBlank(),colors=ButtonDefaults.buttonColors(containerColor=PurpleStart)){Text("Send")}}
+        Row(Modifier.fillMaxWidth().background(Color.White).padding(12.dp),verticalAlignment=Alignment.CenterVertically){TextButton(onClick={text+="😊"}){Text("😊",fontSize=22.sp)};OutlinedTextField(text,{text=it},placeholder={Text("Type a public message...")},singleLine=true,modifier=Modifier.weight(1f));Spacer(Modifier.width(8.dp));Button(onClick={vm.sendMessage(text.trim());text=""},enabled=vm.connected.value&&text.isNotBlank(),colors=ButtonDefaults.buttonColors(containerColor=PurpleStart)){Text("Send")}}
     }
     if(showUsers)OnlineUsersDialog(vm,username,{showUsers=false},{privateUser=it;showUsers=false})
     privateUser?.let{PrivateChatDialog(vm,username,it){privateUser=null}}
@@ -89,36 +89,38 @@ fun parse(raw:String):DisplayMessage?=try{val j=JSONObject(raw);DisplayMessage(j
 
 @Composable fun OnlineUsersDialog(vm:ChatViewModel,me:String,onClose:()->Unit,onSelect:(String)->Unit){
     var filter by remember{mutableStateOf("All")}
-    val users = vm.onlineUsers.filter { user ->
+    val filteredUsers = vm.onlineUsers.filter { user ->
         user != me && (filter == "All" || vm.userGenders.value[user].equals(filter, ignoreCase = true))
     }
+    val groupedUsers = filteredUsers.groupBy { vm.userLocations.value[it].orEmpty().ifBlank { "Unknown" } }.toSortedMap()
+
     AlertDialog(
         onDismissRequest=onClose,
         title={Text("👥 Online Users")},
         text={
             Column(Modifier.fillMaxWidth()){
-                Text("${users.size} users shown • ${vm.onlineUsers.size} online",color=TextMuted)
+                Text("${filteredUsers.size} users shown • ${vm.onlineUsers.size} online",color=TextMuted)
                 Spacer(Modifier.height(10.dp))
                 Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(6.dp)){
                     listOf("All","Male","Female").forEach { option ->
-                        FilterChip(
-                            selected=filter==option,
-                            onClick={filter=option},
-                            label={Text(option)}
-                        )
+                        FilterChip(selected=filter==option,onClick={filter=option},label={Text(option)})
                     }
                 }
                 Spacer(Modifier.height(8.dp))
-                LazyColumn(Modifier.heightIn(max=330.dp)){
-                    items(users){user->
-                        val gender=vm.userGenders.value[user].orEmpty()
-                        val location=vm.userLocations.value[user].orEmpty().ifBlank { "Unknown" }
-                        Row(Modifier.fillMaxWidth().padding(vertical=7.dp),verticalAlignment=Alignment.CenterVertically){
-                            Column(Modifier.weight(1f)){
-                                Text("🟢 $user",fontWeight=FontWeight.SemiBold,color=TextDark)
-                                Text("${if(gender.isBlank()) "Unknown" else gender} • 📍 $location",color=TextMuted,fontSize=12.sp)
+                LazyColumn(Modifier.heightIn(max=360.dp)){
+                    groupedUsers.forEach { (location, users) ->
+                        item(key="location_$location") {
+                            Text("📍 $location  (${users.size})",fontWeight=FontWeight.Bold,color=PurpleEnd,modifier=Modifier.fillMaxWidth().padding(top=10.dp,bottom=4.dp))
+                        }
+                        items(users,key={it}){user->
+                            val gender=vm.userGenders.value[user].orEmpty().ifBlank { "Unknown" }
+                            Row(Modifier.fillMaxWidth().padding(vertical=6.dp),verticalAlignment=Alignment.CenterVertically){
+                                Column(Modifier.weight(1f)){
+                                    Text("🟢 $user",fontWeight=FontWeight.SemiBold,color=TextDark)
+                                    Text(gender,color=TextMuted,fontSize=12.sp)
+                                }
+                                TextButton(onClick={onSelect(user)}){Text("Chat")}
                             }
-                            TextButton(onClick={onSelect(user)}){Text("Chat")}
                         }
                     }
                 }
