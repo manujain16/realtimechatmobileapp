@@ -17,7 +17,8 @@ class ChatWebSocket {
         onMessage: (String) -> Unit,
         onError: (Throwable) -> Unit
     ) {
-        val url = "wss://indiachatdosti.onrender.com/ws"
+        // /ws is the browser SockJS endpoint. Android uses the direct WebSocket endpoint.
+        val url = "wss://indiachatdosti.onrender.com/ws-native"
 
         stompClient = Stomp.over(
             Stomp.ConnectionProvider.OKHTTP,
