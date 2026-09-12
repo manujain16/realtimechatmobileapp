@@ -42,9 +42,7 @@ class ChatViewModel : ViewModel() {
         )
     }
 
-    fun clearIncomingPrivateUser() {
-        incomingPrivateUser.value = null
-    }
+    fun clearIncomingPrivateUser() { incomingPrivateUser.value = null }
 
     private fun updateUsers(raw: String) {
         try {
@@ -62,9 +60,7 @@ class ChatViewModel : ViewModel() {
                 val map = mutableMapOf<String, String>()
                 locationsByState.keys().forEach { location ->
                     locationsByState.optJSONArray(location)?.let { users ->
-                        for (i in 0 until users.length()) {
-                            map[users.getString(i)] = location
-                        }
+                        for (i in 0 until users.length()) map[users.getString(i)] = location
                     }
                 }
                 userLocations.value = map
@@ -77,9 +73,19 @@ class ChatViewModel : ViewModel() {
         chatWebSocket.sendMessage(currentUsername, content)
     }
 
+    fun sendImage(imageData: String) {
+        if (imageData.isBlank() || !connected.value) return
+        chatWebSocket.sendMessage(currentUsername, "", imageData)
+    }
+
     fun sendPrivateMessage(recipient: String, content: String) {
         if (recipient.isBlank() || content.isBlank() || !connected.value) return
         chatWebSocket.sendPrivateMessage(currentUsername, recipient, content)
+    }
+
+    fun sendPrivateImage(recipient: String, imageData: String) {
+        if (recipient.isBlank() || imageData.isBlank() || !connected.value) return
+        chatWebSocket.sendPrivateMessage(currentUsername, recipient, "", imageData)
     }
 
     fun disconnect() { connected.value = false; chatWebSocket.disconnect() }
