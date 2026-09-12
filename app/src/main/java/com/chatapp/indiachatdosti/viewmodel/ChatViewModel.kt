@@ -13,6 +13,7 @@ class ChatViewModel : ViewModel() {
     val privateMessages = mutableStateListOf<String>()
     val onlineUsers = mutableStateListOf<String>()
     val userGenders = mutableStateOf<Map<String, String>>(emptyMap())
+    val userLocations = mutableStateOf<Map<String, String>>(emptyMap())
     val error = mutableStateOf<String?>(null)
     val incomingPrivateUser = mutableStateOf<String?>(null)
     private var currentUsername = ""
@@ -22,6 +23,8 @@ class ChatViewModel : ViewModel() {
         error.value = null
         incomingPrivateUser.value = null
         messages.clear(); privateMessages.clear(); onlineUsers.clear()
+        userGenders.value = emptyMap()
+        userLocations.value = emptyMap()
         chatWebSocket.connect(
             username = username, gender = gender, location = location,
             onConnected = { connected.value = true },
@@ -54,6 +57,17 @@ class ChatViewModel : ViewModel() {
                 val map = mutableMapOf<String, String>()
                 genders.keys().forEach { map[it] = genders.optString(it) }
                 userGenders.value = map
+            }
+            json.optJSONObject("usersByLocation")?.let { locationsByState ->
+                val map = mutableMapOf<String, String>()
+                locationsByState.keys().forEach { location ->
+                    locationsByState.optJSONArray(location)?.let { users ->
+                        for (i in 0 until users.length()) {
+                            map[users.getString(i)] = location
+                        }
+                    }
+                }
+                userLocations.value = map
             }
         } catch (_: Exception) { }
     }
