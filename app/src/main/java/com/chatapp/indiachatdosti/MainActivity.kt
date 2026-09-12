@@ -88,7 +88,44 @@ fun parse(raw:String):DisplayMessage?=try{val j=JSONObject(raw);DisplayMessage(j
 @Composable fun Event(m:DisplayMessage){Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(Color(0xFFE3F2FD)).padding(9.dp)){Text("${m.sender} ${if(m.type=="JOIN")"joined" else "left"} the chat",color=Color(0xFF1976D2),modifier=Modifier.fillMaxWidth(),textAlign=TextAlign.Center,fontSize=13.sp)}}
 
 @Composable fun OnlineUsersDialog(vm:ChatViewModel,me:String,onClose:()->Unit,onSelect:(String)->Unit){
-    AlertDialog(onDismissRequest=onClose,title={Text("👥 Online Users")},text={Column{Text("${vm.onlineUsers.size} users online",color=TextMuted);Spacer(Modifier.height(8.dp));LazyColumn{items(vm.onlineUsers.filter{it!=me}){user->Row(Modifier.fillMaxWidth().padding(vertical=7.dp),verticalAlignment=Alignment.CenterVertically){Text("🟢 $user",modifier=Modifier.weight(1f));TextButton(onClick={onSelect(user)}){Text("Chat")}}}}}},confirmButton={TextButton(onClick=onClose){Text("Close")}})
+    var filter by remember{mutableStateOf("All")}
+    val users = vm.onlineUsers.filter { user ->
+        user != me && (filter == "All" || vm.userGenders.value[user].equals(filter, ignoreCase = true))
+    }
+    AlertDialog(
+        onDismissRequest=onClose,
+        title={Text("👥 Online Users")},
+        text={
+            Column(Modifier.fillMaxWidth()){
+                Text("${users.size} users shown • ${vm.onlineUsers.size} online",color=TextMuted)
+                Spacer(Modifier.height(10.dp))
+                Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(6.dp)){
+                    listOf("All","Male","Female").forEach { option ->
+                        FilterChip(
+                            selected=filter==option,
+                            onClick={filter=option},
+                            label={Text(option)}
+                        )
+                    }
+                }
+                Spacer(Modifier.height(8.dp))
+                LazyColumn(Modifier.heightIn(max=330.dp)){
+                    items(users){user->
+                        val gender=vm.userGenders.value[user].orEmpty()
+                        val location=vm.userLocations.value[user].orEmpty().ifBlank { "Unknown" }
+                        Row(Modifier.fillMaxWidth().padding(vertical=7.dp),verticalAlignment=Alignment.CenterVertically){
+                            Column(Modifier.weight(1f)){
+                                Text("🟢 $user",fontWeight=FontWeight.SemiBold,color=TextDark)
+                                Text("${if(gender.isBlank()) "Unknown" else gender} • 📍 $location",color=TextMuted,fontSize=12.sp)
+                            }
+                            TextButton(onClick={onSelect(user)}){Text("Chat")}
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton={TextButton(onClick=onClose){Text("Close")}}
+    )
 }
 
 @Composable fun PrivateChatDialog(vm:ChatViewModel,me:String,recipient:String,onClose:()->Unit){
