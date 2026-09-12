@@ -4,58 +4,56 @@ import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.ViewModel
 import com.chatapp.indiachatdosti.websocket.ChatWebSocket
+import org.json.JSONObject
 
 class ChatViewModel : ViewModel() {
-
     private val chatWebSocket = ChatWebSocket()
-
     val connected = mutableStateOf(false)
     val messages = mutableStateListOf<String>()
+    val privateMessages = mutableStateListOf<String>()
+    val onlineUsers = mutableStateListOf<String>()
+    val userGenders = mutableStateOf<Map<String, String>>(emptyMap())
     val error = mutableStateOf<String?>(null)
-
     private var currentUsername = ""
 
-    fun connect(
-        username: String,
-        gender: String,
-        location: String
-    ) {
+    fun connect(username: String, gender: String, location: String) {
         currentUsername = username
         error.value = null
-
+        messages.clear(); privateMessages.clear(); onlineUsers.clear()
         chatWebSocket.connect(
-            username = username,
-            gender = gender,
-            location = location,
-            onConnected = {
-                connected.value = true
-            },
-            onMessage = { message ->
-                messages.add(message)
-            },
-            onError = { throwable ->
-                connected.value = false
-                error.value = throwable.message ?: "WebSocket connection error"
-            }
+            username = username, gender = gender, location = location,
+            onConnected = { connected.value = true },
+            onPublicMessage = { message -> messages.add(message); updateUsers(message) },
+            onPrivateMessage = { message -> privateMessages.add(message) },
+            onError = { throwable -> connected.value = false; error.value = throwable.message ?: "WebSocket connection error" }
         )
+    }
+
+    private fun updateUsers(raw: String) {
+        try {
+            val json = JSONObject(raw)
+            json.optJSONArray("onlineUsers")?.let { users ->
+                onlineUsers.clear()
+                for (i in 0 until users.length()) onlineUsers.add(users.getString(i))
+            }
+            json.optJSONObject("userGenders")?.let { genders ->
+                val map = mutableMapOf<String, String>()
+                genders.keys().forEach { map[it] = genders.optString(it) }
+                userGenders.value = map
+            }
+        } catch (_: Exception) { }
     }
 
     fun sendMessage(content: String) {
         if (content.isBlank() || !connected.value) return
-
-        chatWebSocket.sendMessage(
-            username = currentUsername,
-            content = content
-        )
+        chatWebSocket.sendMessage(currentUsername, content)
     }
 
-    fun disconnect() {
-        connected.value = false
-        chatWebSocket.disconnect()
+    fun sendPrivateMessage(recipient: String, content: String) {
+        if (recipient.isBlank() || content.isBlank() || !connected.value) return
+        chatWebSocket.sendPrivateMessage(currentUsername, recipient, content)
     }
 
-    override fun onCleared() {
-        super.onCleared()
-        chatWebSocket.disconnect()
-    }
+    fun disconnect() { connected.value = false; chatWebSocket.disconnect() }
+    override fun onCleared() { super.onCleared(); chatWebSocket.disconnect() }
 }
