@@ -7,7 +7,6 @@ import ua.naiksoftware.stomp.StompClient
 class ChatWebSocket {
 
     private lateinit var stompClient: StompClient
-
     private var publicSubscription: Disposable? = null
 
     fun connect(
@@ -18,7 +17,6 @@ class ChatWebSocket {
         onMessage: (String) -> Unit,
         onError: (Throwable) -> Unit
     ) {
-
         val url = "wss://indiachatdosti.onrender.com/ws"
 
         stompClient = Stomp.over(
@@ -30,17 +28,11 @@ class ChatWebSocket {
 
         stompClient.lifecycle()
             .subscribe { lifecycleEvent ->
-
                 when (lifecycleEvent.type) {
-
                     ua.naiksoftware.stomp.dto.LifecycleEvent.Type.OPENED -> {
-
                         println("STOMP connected")
-
                         onConnected()
-
-                        subscribeToPublicChat()
-
+                        subscribeToPublicChat(onMessage)
                         addUser(
                             username,
                             gender,
@@ -49,38 +41,31 @@ class ChatWebSocket {
                     }
 
                     ua.naiksoftware.stomp.dto.LifecycleEvent.Type.ERROR -> {
-
                         lifecycleEvent.exception?.let {
                             onError(it)
                         }
                     }
 
                     ua.naiksoftware.stomp.dto.LifecycleEvent.Type.CLOSED -> {
-
                         println("STOMP connection closed")
                     }
 
-                    else -> {
-                    }
+                    else -> {}
                 }
             }
     }
 
-    private fun subscribeToPublicChat() {
-
+    private fun subscribeToPublicChat(onMessage: (String) -> Unit) {
         publicSubscription = stompClient.topic("/topic/public")
             .subscribe(
                 { message ->
-
                     println("Received: ${message.payload}")
 
-                    // Send received message back to Android UI
                     message.payload?.let {
-                        // We'll connect this to ViewModel in the next step
+                        onMessage(it)
                     }
                 },
                 { error ->
-
                     println("Subscription error: $error")
                 }
             )
@@ -91,7 +76,6 @@ class ChatWebSocket {
         gender: String,
         location: String
     ) {
-
         val json = """
             {
                 "sender": "$username",
@@ -118,7 +102,6 @@ class ChatWebSocket {
         username: String,
         content: String
     ) {
-
         val json = """
             {
                 "sender": "$username",
@@ -141,9 +124,7 @@ class ChatWebSocket {
     }
 
     fun disconnect() {
-
         publicSubscription?.dispose()
-
         if (::stompClient.isInitialized) {
             stompClient.disconnect()
         }
