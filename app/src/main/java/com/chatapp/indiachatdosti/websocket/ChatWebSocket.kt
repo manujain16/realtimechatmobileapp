@@ -31,7 +31,7 @@ class ChatWebSocket {
             .build()
 
         webSocket = client.newWebSocket(request, object : WebSocketListener() {
-            override fun onOpen(webSocket: WebSocket, response: Response) = sendStompConnect(webSocket)
+            override fun onOpen(webSocket: WebSocket, response: Response) = sendStompConnect(webSocket, username)
             override fun onMessage(webSocket: WebSocket, text: String) = processIncoming(text, webSocket, username, gender, location, onConnected, onPublicMessage, onPrivateMessage)
             override fun onMessage(webSocket: WebSocket, bytes: ByteString) = processIncoming(bytes.utf8(), webSocket, username, gender, location, onConnected, onPublicMessage, onPrivateMessage)
             override fun onClosed(webSocket: WebSocket, code: Int, reason: String) { stompConnected = false }
@@ -39,10 +39,11 @@ class ChatWebSocket {
         })
     }
 
-    private fun sendStompConnect(webSocket: WebSocket) {
+    private fun sendStompConnect(webSocket: WebSocket, username: String) {
         webSocket.send(buildFrame("CONNECT", listOf(
             "accept-version" to "1.2",
             "host" to "indiachatdosti.onrender.com",
+            "login" to username,
             "heart-beat" to "10000,10000"
         )))
     }
