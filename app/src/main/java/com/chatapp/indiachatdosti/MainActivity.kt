@@ -62,6 +62,15 @@ class MainActivity : ComponentActivity() { override fun onCreate(savedInstanceSt
 @Composable fun ChatScreen(vm:ChatViewModel,username:String){
     var text by remember{mutableStateOf("")}; var showUsers by remember{mutableStateOf(false)}; var privateUser by remember{mutableStateOf<String?>(null)}
     val public=vm.messages.mapNotNull{parse(it)}
+
+    LaunchedEffect(vm.incomingPrivateUser.value) {
+        vm.incomingPrivateUser.value?.let {
+            privateUser = it
+            showUsers = false
+            vm.clearIncomingPrivateUser()
+        }
+    }
+
     Column(Modifier.fillMaxSize().background(Color.White)){
         Box(Modifier.fillMaxWidth().background(Brush.linearGradient(listOf(PurpleStart,PurpleEnd))).padding(16.dp)){
             Column(Modifier.fillMaxWidth(),horizontalAlignment=Alignment.CenterHorizontally){Text("💬 Chat Room",color=Color.White,fontSize=21.sp,fontWeight=FontWeight.Bold);Text("Welcome, $username!",color=Color.White.copy(.9f),fontSize=14.sp);Text(if(vm.connected.value)"● Connected" else "⏳ Connecting...",color=Color.White.copy(.9f),fontSize=12.sp)}
