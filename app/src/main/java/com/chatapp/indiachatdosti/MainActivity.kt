@@ -93,6 +93,7 @@ fun parse(raw:String):DisplayMessage?=try{val j=JSONObject(raw);DisplayMessage(j
         user != me && (filter == "All" || vm.userGenders.value[user].equals(filter, ignoreCase = true))
     }
     val groupedUsers = filteredUsers.groupBy { vm.userLocations.value[it].orEmpty().ifBlank { "Unknown" } }.toSortedMap()
+    val expandedLocations = remember { mutableStateMapOf<String, Boolean>() }
 
     AlertDialog(
         onDismissRequest=onClose,
@@ -109,17 +110,32 @@ fun parse(raw:String):DisplayMessage?=try{val j=JSONObject(raw);DisplayMessage(j
                 Spacer(Modifier.height(8.dp))
                 LazyColumn(Modifier.heightIn(max=360.dp)){
                     groupedUsers.forEach { (location, users) ->
+                        val expanded = expandedLocations[location] ?: true
                         item(key="location_$location") {
-                            Text("📍 $location  (${users.size})",fontWeight=FontWeight.Bold,color=PurpleEnd,modifier=Modifier.fillMaxWidth().padding(top=10.dp,bottom=4.dp))
-                        }
-                        items(users,key={it}){user->
-                            val gender=vm.userGenders.value[user].orEmpty().ifBlank { "Unknown" }
-                            Row(Modifier.fillMaxWidth().padding(vertical=6.dp),verticalAlignment=Alignment.CenterVertically){
-                                Column(Modifier.weight(1f)){
-                                    Text("🟢 $user",fontWeight=FontWeight.SemiBold,color=TextDark)
-                                    Text(gender,color=TextMuted,fontSize=12.sp)
+                            Surface(
+                                modifier=Modifier.fillMaxWidth().padding(top=6.dp),
+                                shape=RoundedCornerShape(8.dp),
+                                color=PageBackground,
+                                onClick={expandedLocations[location] = !expanded}
+                            ) {
+                                Row(Modifier.fillMaxWidth().padding(horizontal=10.dp,vertical=9.dp),verticalAlignment=Alignment.CenterVertically){
+                                    Text(if(expanded) "▼" else "▶",fontSize=13.sp)
+                                    Spacer(Modifier.width(7.dp))
+                                    Text("📍 $location",fontWeight=FontWeight.Bold,color=PurpleEnd,modifier=Modifier.weight(1f))
+                                    Text("${users.size}",fontWeight=FontWeight.Bold,color=TextMuted,fontSize=12.sp)
                                 }
-                                TextButton(onClick={onSelect(user)}){Text("Chat")}
+                            }
+                        }
+                        if(expanded){
+                            items(users,key={"user_${location}_$it"}){user->
+                                val gender=vm.userGenders.value[user].orEmpty().ifBlank { "Unknown" }
+                                Row(Modifier.fillMaxWidth().padding(start=24.dp,top=6.dp,bottom=6.dp),verticalAlignment=Alignment.CenterVertically){
+                                    Column(Modifier.weight(1f)){
+                                        Text("🟢 $user",fontWeight=FontWeight.SemiBold,color=TextDark)
+                                        Text(gender,color=TextMuted,fontSize=12.sp)
+                                    }
+                                    TextButton(onClick={onSelect(user)}){Text("Chat")}
+                                }
                             }
                         }
                     }
